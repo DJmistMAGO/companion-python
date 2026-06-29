@@ -20,8 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let lipSyncInterval;
 
     function populateVoiceList() {
+        if (!window.speechSynthesis) return;
         const allVoices = speechSynthesis.getVoices();
         voices = allVoices.filter(voice => voice.name.includes('Google'));
+        if (voices.length === 0) {
+            voices = allVoices;
+        }
         voiceSelect.innerHTML = '';
 
         let usVoiceIndex = -1;
@@ -45,12 +49,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    populateVoiceList();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = populateVoiceList;
+    if (window.speechSynthesis) {
+        populateVoiceList();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = populateVoiceList;
+        }
     }
 
+    let typewriterTimeout;
+
     const typewriter = (text, element, speed = 50) => {
+        if (typewriterTimeout) {
+            clearTimeout(typewriterTimeout);
+        }
         // Use Intl.Segmenter to handle grapheme clusters correctly
         if (window.Intl && Intl.Segmenter) {
             const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -63,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (i < segments.length) {
                     element.innerHTML += segments[i];
                     i++;
-                    setTimeout(type, speed);
+                    typewriterTimeout = setTimeout(type, speed);
                 }
             }
             type();
@@ -75,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (i < text.length) {
                     element.innerHTML += text.charAt(i);
                     i++;
-                    setTimeout(type, speed);
+                    typewriterTimeout = setTimeout(type, speed);
                 }
             }
             type();
@@ -83,16 +94,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const speak = (text) => {
+        if (!window.speechSynthesis) return;
+
         if (speechSynthesis.speaking) {
             speechSynthesis.cancel();
         }
         clearInterval(lipSyncInterval);
 
         const utterance = new SpeechSynthesisUtterance(text);
-        const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
-        const selectedVoice = voices.find(voice => voice.name === selectedOption);
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+        if (voiceSelect.selectedOptions && voiceSelect.selectedOptions.length > 0) {
+            const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+            const selectedVoice = voices.find(voice => voice.name === selectedOption);
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
         }
 
         utterance.onstart = () => {
